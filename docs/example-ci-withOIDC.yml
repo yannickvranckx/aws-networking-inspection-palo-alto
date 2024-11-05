@@ -1,0 +1,86 @@
+image: 
+  name: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
+  entrypoint:
+    - /usr/bin/env
+    - ‘PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin’
+variables:
+  TF_ROOT: ${CI_PROJECT_DIR}
+  TF_STATE_NAME: terraform-state
+
+cache:
+  key: "${TF_ROOT}"
+  paths:
+    - ${TF_ROOT}/.terraform/
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+
+stages:
+  - prepare
+  - build
+  - deploy
+  - destroy
+
+init:
+  stage: prepare
+  script:
+    - gitlab-terraform init
+    - gitlab-terraform validate
+
+# Terraform plan action with OpenID authentication
+plan:
+  stage: build
+  script:
+    - gitlab-terraform plan
+    - gitlab-terraform plan-json
+  id_tokens:
+    OIDC_TOKEN:
+      aud: https://gitlab.com
+  resource_group: ${TF_STATE_NAME}
+  artifacts:
+    name: plan
+    paths:
+      - ${TF_ROOT}/plan.cache
+    reports:
+      terraform: ${TF_ROOT}/plan.json
+
+# Terraform apply action with OpenID authentication
+# Set as a MANUAL action, because it can have impact - Depends on build stage
+apply:
+  stage: deploy
+  environment:
+    name: production
+  script:
+    - gitlab-terraform apply
+    - gitlab-terraform output -json | jq . > output.json
+  id_tokens:
+    OIDC_TOKEN:
+      aud: https://gitlab.com
+  resource_group: ${TF_STATE_NAME}
+  dependencies:
+    - plan
+  when: manual
+  only:
+    - main
+  artifacts:
+    name: output
+    paths:
+      - ${TF_ROOT}/output.json
+  
+# Terraform destroy action with OpenID authentication
+# Set as a MANUAL action, because it can have impact
+destroy:
+  stage: destroy
+  script:
+    - gitlab-terraform destroy
+  resource_group: ${TF_STATE_NAME}
+  id_tokens:
+    OIDC_TOKEN:
+      aud: https://gitlab.com
+  dependencies:
+    - apply
+  when: manual 
+  only:
+    - main
