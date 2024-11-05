@@ -1,4 +1,4 @@
-#Store state file remote (Gitlab)
+#Store state file remote
 terraform {
   backend "http" {
   }
