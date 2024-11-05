@@ -3,15 +3,15 @@
 
 # SMI DEV Routing
 resource "aws_ec2_transit_gateway_route_table_association" "smi_dev" { # Association of Route Table to Inspection VPC
-  transit_gateway_attachment_id  = local.smi_dev_attach
+  transit_gateway_attachment_id  = local.attachment_tgw
   transit_gateway_route_table_id = local.inspection_rt
 }
 resource "aws_ec2_transit_gateway_route_table_propagation" "smi_dev" { # Propagation of VPC CIDR to the Post-Inspection Route Table
-  transit_gateway_attachment_id  = local.smi_dev_attach
+  transit_gateway_attachment_id  = local.attachment_tgw
   transit_gateway_route_table_id = local.post_inspection_rt
 }
 resource "aws_ec2_transit_gateway_route" "smi_dev" { # A static return route to force traffic back to the Inspection layer (TO BE REMOVED AFTER MIGRATION)
-  destination_cidr_block         = local.smi_dev_cidr
+  destination_cidr_block         = local.attachment_tgw_cidr
   transit_gateway_attachment_id  = local.firewall_vpc
   transit_gateway_route_table_id = local.peering_rt
 }
